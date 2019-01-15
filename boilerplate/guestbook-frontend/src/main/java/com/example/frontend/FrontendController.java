@@ -3,6 +3,7 @@ package com.example.frontend;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.context.config.annotation.RefreshScope;
+import org.springframework.cloud.gcp.pubsub.core.*;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -19,6 +20,9 @@ import java.util.Map;
 public class FrontendController {
 	@Autowired
 	private GuestbookMessagesClient client;
+
+	@Autowired
+    private PubSubTemplate pubSubTemplate;
 	
 	@Value("${greeting:Hello}")
 	private String greeting;
@@ -42,6 +46,8 @@ public class FrontendController {
 			payload.put("name", name);
 			payload.put("message", message);
 			client.add(payload);
+
+			pubSubTemplate.publish("messages", name + ": " + message);
 		}
 		return "redirect:/";
   }
