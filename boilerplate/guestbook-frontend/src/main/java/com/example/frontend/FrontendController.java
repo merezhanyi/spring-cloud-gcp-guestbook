@@ -11,6 +11,14 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.SessionAttributes;
 
+import org.springframework.cloud.gcp.core.GcpProjectIdProvider;
+import org.springframework.web.multipart.MultipartFile;
+import org.springframework.context.ApplicationContext;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.WritableResource;
+import org.springframework.util.StreamUtils;
+import java.io.*;
+
 import java.util.HashMap;
 import java.util.Map;
 
@@ -21,11 +29,21 @@ public class FrontendController {
 	@Autowired
 	private GuestbookMessagesClient client;
 
-	@Autowired
-    private PubSubTemplate pubSubTemplate;
+	//@Autowired
+    //private PubSubTemplate pubSubTemplate;
+    @Autowired
+	private OutboundGateway outboundGateway;
 	
 	@Value("${greeting:Hello}")
 	private String greeting;
+
+    // We need the ApplicationContext in order to create a new Resource.
+	@Autowired
+	private ApplicationContext context;
+
+	// We need to know the Project ID, because it's Cloud Storage bucket name
+	@Autowired
+	private GcpProjectIdProvider projectIdProvider;
 	
 	@GetMapping("/")
 	public String index(Model model) {
@@ -38,8 +56,33 @@ public class FrontendController {
 	}
 	
 	@PostMapping("/post")
-	public String post(@RequestParam String name, @RequestParam String message, Model model) {
+	public String post(
+        @RequestParam(name="file", required=false) MultipartFile file,
+        @RequestParam String name, 
+        @RequestParam String message, Model model) 
+        throws IOException
+        {
+                
 		model.addAttribute("name", name);
+
+        String filename = null;
+		if (file != null && !file.isEmpty()
+			&& file.getContentType().equals("image/jpeg")) {
+
+			// Bucket ID is our Project ID
+			String bucket = "gs://" + projectIdProvider.getProjectId();
+
+			// Generate a random file name
+			filename = UUID.randomUUID().toString() + ".jpg";
+			WritableResource resource = (WritableResource) 
+				context.getResource(bucket + "/" + filename);
+
+			// Write the file to Cloud Storage using WritableResource
+			try (OutputStream os = resource.getOutputStream()) {
+				os.write(file.getBytes());
+			}
+		}
+        
 		if (message != null && !message.trim().isEmpty()) {
 			// Post the message to the backend service
 			Map<String, String> payload = new HashMap<>();
@@ -47,7 +90,8 @@ public class FrontendController {
 			payload.put("message", message);
 			client.add(payload);
 
-			pubSubTemplate.publish("messages", name + ": " + message);
+			//pubSubTemplate.publish("messages", name + ": " + message);
+            outboundGateway.publishMessage(name + ": " + message);
 		}
 		return "redirect:/";
   }
