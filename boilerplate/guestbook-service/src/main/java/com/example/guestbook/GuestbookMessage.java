@@ -1,23 +1,24 @@
 package com.example.guestbook;
 
-import lombok.Data;
+import lombok.*;
+import org.springframework.cloud.gcp.data.spanner.core.mapping.*;
+import org.springframework.data.annotation.Id;
 
-import javax.persistence.Entity;
-import javax.persistence.GeneratedValue;
-import javax.persistence.GenerationType;
-import javax.persistence.Id;
-
-@Entity
 @Data
+@Table(name = "guestbook_message")
 public class GuestbookMessage {
+	@PrimaryKey
 	@Id
-	@GeneratedValue(strategy = GenerationType.IDENTITY)
-	private Long id;
-	
+	private String id;
+
 	private String name;
 	
 	private String message;
-	
-	private String imageUri;
-}
 
+	@Column(name = "image_uri")
+	private String imageUri;
+
+	public GuestbookMessage() {
+		this.id = java.util.UUID.randomUUID().toString();
+	}
+}
